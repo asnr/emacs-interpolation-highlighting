@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 
 ;; Going to do interpolation highlighting just with font-lock-defaults and
 ;; font-lock-extend-region-functions. This means we need to keep track of where
@@ -10,18 +11,8 @@
          (0 font-lock-keyword-face)  ;; subexp-highlighter - face for FOO
          (".*\\(\n.+\\)*BAR" (my-end-of-paragraph-position) nil (0 font-lock-variable-name-face)))))
 
-(defun build-string-delimiters ()
-  ;; Note we're not attempting to deal with comments here. Doing so will add a
-  ;; decent amount of complexity
-
-  (let ((string-delimiters ()))
-   (save-excursion
-     (goto-char (point-min))
-     (while (search-forward "\"" nil t)
-       (setq string-delimiters (cons (point) string-delimiters)))
-     (reverse string-delimiters))))
-
 (defun delimiters-in-region (start end)
+  ;; We store the point immediately after the `"' in the delimiter list.
   ;; Note we're not attempting to deal with comments here. Doing so will add a
   ;; decent amount of complexity
   (let ((string-delimiters ()))
@@ -62,17 +53,16 @@
                      delimiters-after-region)))
 
 (defun delimiters-before-region (delimiters region-begin)
-  (seq-take-while (lambda (pos) (< pos region-begin)) delimiters))
+  (seq-take-while (lambda (pos) (<= pos region-begin)) delimiters))
 
 (defun delimiters-after-region (delimiters region-end)
-  (seq-drop-while (lambda (pos) (< pos region-end)) delimiters))
+  (seq-drop-while (lambda (pos) (<= pos region-end)) delimiters))
 
 (define-derived-mode interpolation-mode fundamental-mode "interpolation"
   "major mode for getting interpolation highlighting to work."
-  (setq-local string-delimiters (build-string-delimiters))
+  (setq-local string-delimiters (delimiters-in-region (point-min) (point-max)))
   (message "%s" string-delimiters)
   ;; (setq font-lock-defaults '(interpolation-highlights))
   ;; (setq font-lock-multiline t)  Is this on by default?
   ;; (add-hook 'font-lock-extend-region-functions 'extend-region-to-paragraph)
-  (add-hook 'after-change-functions 'update-string-delimiters nil t)
-  )
+  (add-hook 'after-change-functions 'update-string-delimiters nil t))
