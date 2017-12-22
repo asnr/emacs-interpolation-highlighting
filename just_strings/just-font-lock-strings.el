@@ -1,8 +1,10 @@
 ;; -*- lexical-binding: t; -*-
 
-;; Going to do interpolation highlighting just with font-lock-defaults and
-;; font-lock-extend-region-functions. This means we need to keep track of where
-;; the strings are in the buffer.
+;; This file implements string highlighting just with font-lock-defaults and
+;; font-lock-extend-region-functions. (We allow strings to span multiple lines.)
+;; We don't want to reread the buffer from the start to correctly rehighlight,
+;; so we keep track of current string delimiters with the `string-delimiters'
+;; buffer-local list.
 
 ;; We use `:' as the string delimiter, so that we don't have to deal with
 ;; disabling the string definition in the syntax table that we inherit from
