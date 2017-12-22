@@ -6,10 +6,7 @@
 
 (setq interpolation-highlights
       '(("Sin\\|Cos\\|Sum" . font-lock-function-name-face)
-        ("Pi\\|Infinity" . font-lock-constant-face)
-        ("^FOO"
-         (0 font-lock-keyword-face)  ;; subexp-highlighter - face for FOO
-         (".*\\(\n.+\\)*BAR" (my-end-of-paragraph-position) nil (0 font-lock-variable-name-face)))))
+        (":\\(.\\|\n\\)*?:" . font-lock-constant-face)))
 
 (defun delimiters-in-region (start end)
   ;; We store the point immediately after the `"' in the delimiter list.
@@ -18,7 +15,7 @@
   (let ((string-delimiters ()))
     (save-excursion
       (goto-char start)
-      (while (and (search-forward "\"" nil t) (<= (point) end))
+      (while (and (search-forward ":" nil t) (<= (point) end))
         (setq string-delimiters (cons (point) string-delimiters)))
       (reverse string-delimiters))))
 
@@ -62,7 +59,7 @@
   "major mode for getting interpolation highlighting to work."
   (setq-local string-delimiters (delimiters-in-region (point-min) (point-max)))
   (message "%s" string-delimiters)
-  ;; (setq font-lock-defaults '(interpolation-highlights))
+  (setq font-lock-defaults '(interpolation-highlights))
   ;; (setq font-lock-multiline t)  Is this on by default?
   ;; (add-hook 'font-lock-extend-region-functions 'extend-region-to-paragraph)
   (add-hook 'after-change-functions 'update-string-delimiters nil t))
