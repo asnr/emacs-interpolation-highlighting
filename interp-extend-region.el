@@ -4,12 +4,28 @@
 ;; font-lock-extend-region-functions. This means we need to keep track of where
 ;; the strings are in the buffer.
 
+;; We use `:' as the string delimiter, so that we don't have to deal with
+;; disabling the string definition in the syntax table that we inherit from
+;; `fundamental-mode'
+
+;; Like many regexes, this is surprisingly fiddly.
+;; - Naive greedy matching of the string contents (i.e. something like
+;; `.*') wouldn't work because we would end up with one big string instead of
+;; lots of small ones.
+;; - The closing delimiter should be optional because an unmatched string
+;; delimiter should match the rest of the document, thus alerting the user to
+;; the dangling delimiter. (Maybe we don't need this feature?)
+;; - Once we make the closing delimiter optional, lazy matching the string
+;; contents will always result in the entire string being just the opening
+;; delimiter `:', so we need to simulate lazy matching using `[^:]'
+(defconst custom-string-regex ":\\([^:]\\|\n\\)*:?" )
+
 (setq interpolation-highlights
-      '(("Sin\\|Cos\\|Sum" . font-lock-function-name-face)
-        (":\\(.\\|\n\\)*?:" . font-lock-constant-face)))
+      ;; Don't use string font face to make it easier to spot
+      `((,custom-string-regex . font-lock-constant-face)))
 
 (defun delimiters-in-region (start end)
-  ;; We store the point immediately after the `"' in the delimiter list.
+  ;; We store the point immediately after the `:' in the delimiter list.
   ;; Note we're not attempting to deal with comments here. Doing so will add a
   ;; decent amount of complexity
   (let ((string-delimiters ()))
@@ -22,13 +38,10 @@
 (defun update-string-delimiters (change-region-begin
                                  change-region-end
                                  original-region-length)
-  (message "hook args: change-region-begin = %d, change-region-end = %d, original-region-length = %d" change-region-begin change-region-end original-region-length)
-  (message "HOOK START, string-delimiters: %s" string-delimiters)
   (setq string-delimiters (delimiters-update string-delimiters
                                              change-region-begin
                                              change-region-end
-                                             original-region-length))
-  (message "HOOK END,   string-delimiters: %s" string-delimiters))
+                                             original-region-length)))
 
 (defun delimiters-update (delimiters
                           change-region-begin
@@ -55,11 +68,55 @@
 (defun delimiters-after-region (delimiters region-end)
   (seq-drop-while (lambda (pos) (<= pos region-end)) delimiters))
 
+;; Extend the start of region to be syntax-highlighted to include the opening
+;; delimiter if the start of the region falls inside of a delimiter pair.
+;;
+;; Why isn't the end of the region being extended as well? Good question.
+;; Suppose the user enters a delimiter in the middle of an existing delimiter
+;; pair, for example
+;;
+;;   outside :inside |the string: outside again    <-- '|' indicates cursor
+;;
+;; then
+;;
+;;   outside :inside :|the string: outside again
+;;
+;; This will cause all the following delimiter pairs to 'flip': everything that
+;; was previously inside a string will be outside and vice versa. Thus if we
+;; wanted to expand the region to capture all of the syntax highlighting
+;; changes, we would have to extend it to the end of the document. This could
+;; lead to a significant pause after inserting the character, which we want to
+;; avoid. Thus we settle for occasionally incorrect, but always fast
+;; re-highlighting and do not extend the end of the region out.
+;;
+;; It so happens that a few moments after the user stops entering text, while
+;; emacs is idle, the whole document get re-highlighted. Thus even though our
+;; re-highlighting may be wrong initially, this gets corrected soon enough. This
+;; is the behaviour of string highlighting by the syntax table in
+;; fundamental-mode as well, so at the very least we are delivering a
+;; user-experience consistent with the rest of emacs.
+(defun extend-region-to-string ()
+  (let* ((start-of-delimiter-pair (start-of-delimiter-pair string-delimiters
+                                                           font-lock-beg))
+         (adjust-beg (< start-of-delimiter-pair font-lock-beg)))
+    (when adjust-beg (setq font-lock-beg start-of-delimiter-pair))
+    adjust-beg))
+
+
+(defun start-of-delimiter-pair (delimiters position)
+  (let* ((before-position-p (lambda (delimiter) (<= delimiter position)))
+         (delimiters-before-position (seq-take-while before-position-p delimiters))
+         (num-delimiters-before-position (seq-length delimiters-before-position))
+         (position-outside-pair (zerop (mod num-delimiters-before-position 2))))
+    (if position-outside-pair
+        position
+      (let ((opening-delimiter (elt (seq-reverse delimiters-before-position) 0)))
+        (1- opening-delimiter)))))
+
 (define-derived-mode interpolation-mode fundamental-mode "interpolation"
   "major mode for getting interpolation highlighting to work."
   (setq-local string-delimiters (delimiters-in-region (point-min) (point-max)))
-  (message "%s" string-delimiters)
   (setq font-lock-defaults '(interpolation-highlights))
-  ;; (setq font-lock-multiline t)  Is this on by default?
-  ;; (add-hook 'font-lock-extend-region-functions 'extend-region-to-paragraph)
+  (setq font-lock-multiline t)
+  (add-hook 'font-lock-extend-region-functions 'extend-region-to-string nil t)
   (add-hook 'after-change-functions 'update-string-delimiters nil t))
