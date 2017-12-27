@@ -22,7 +22,7 @@
 ;; delimiter `:', so we need to simulate lazy matching using `[^:]'
 (defconst custom-string-regex ":\\([^:]\\|\n\\)*:?" )
 
-(setq interpolation-highlights
+(setq just-strings-highlights
       ;; Don't use string font face to make it easier to spot
       `((,custom-string-regex . font-lock-constant-face)))
 
@@ -115,10 +115,9 @@
       (let ((opening-delimiter (elt (seq-reverse delimiters-before-position) 0)))
         (1- opening-delimiter)))))
 
-(define-derived-mode interpolation-mode fundamental-mode "interpolation"
-  "major mode for getting interpolation highlighting to work."
+(define-derived-mode just-strings-mode fundamental-mode "just-strings"
   (setq-local string-delimiters (delimiters-in-region (point-min) (point-max)))
-  (setq font-lock-defaults '(interpolation-highlights))
+  (setq font-lock-defaults '(just-strings-highlights))
   (setq font-lock-multiline t)
   (add-hook 'font-lock-extend-region-functions 'extend-region-to-string nil t)
   (add-hook 'after-change-functions 'update-string-delimiters nil t))
