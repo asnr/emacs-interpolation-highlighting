@@ -91,12 +91,12 @@
 ;; avoid. Thus we settle for occasionally incorrect, but always fast
 ;; re-highlighting and do not extend the end of the region out.
 ;;
-;; It so happens that a few moments after the user stops entering text, while
-;; emacs is idle, the whole document get re-highlighted. Thus even though our
-;; re-highlighting may be wrong initially, this gets corrected soon enough. This
-;; is the behaviour of string highlighting by the syntax table in
-;; fundamental-mode as well, so at the very least we are delivering a
-;; user-experience consistent with the rest of emacs.
+;; We have set `font-lock-multiline' to `t', so a few moments after the user
+;; stops entering text, while emacs is idle, the whole document is
+;; re-highlighted. Thus even though our re-highlighting may be wrong initially,
+;; this gets corrected soon enough. This is the behaviour of string highlighting
+;; by the syntax table in fundamental-mode as well, so at the very least we are
+;; delivering a user-experience consistent with the rest of emacs.
 (defun extend-region-to-string ()
   (let* ((start-of-delimiter-pair (start-of-delimiter-pair string-delimiters
                                                            font-lock-beg))
