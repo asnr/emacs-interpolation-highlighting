@@ -13,7 +13,7 @@
 
 (defconst interpolation-regex "\\${\\([^}]\\|\n\\)*}?")
 
-(setq interpolation-highlights `((,interpolation-regex . font-lock-constant-face)))
+(setq interpolation-highlights `((,interpolation-regex 0 font-lock-constant-face prepend)))
 
 (define-derived-mode interpolation-mode fundamental-mode "interpolation"
   (setq font-lock-defaults '(interpolation-highlights))
