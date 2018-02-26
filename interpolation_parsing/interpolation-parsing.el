@@ -21,7 +21,7 @@
     ("${" . ,INTERP-TOKEN-OPEN-INTERP)
     ("}"  . ,INTERP-TOKEN-CLOSE-INTERP)))
 
-(defconst interp-special-token-regex "\"\\|\\(${\\)\\|\\($}\\)")
+(defconst interp-special-token-regex (regexp-opt '("\"" "${" "}")))
 
 (defun interp-special-token-type (special-token-string)
   (cdr (assoc special-token-string INTERP-SPECIAL-TOKEN-ALIST)))
