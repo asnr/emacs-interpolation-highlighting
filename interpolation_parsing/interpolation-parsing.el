@@ -45,10 +45,10 @@
                 (cons special-token (interp-remaining-tokens))
               (cons (interp-token INTERP-TOKEN-TEXT start-point match-start)
                     (cons special-token (interp-remaining-tokens)))))
-        (cons INTERP-TOKEN-TEXT start-point (point-max))))))
+        (cons (interp-token INTERP-TOKEN-TEXT start-point (point-max)) ())))))
 
 (defun interp-lex()
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (message "Lex result: %s"(interp-remaining-tokens))))
+    (message "Lex result: %s" (interp-remaining-tokens))))
