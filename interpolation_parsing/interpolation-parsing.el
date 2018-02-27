@@ -32,8 +32,14 @@
 (defun interp-special-token-type (special-token-string)
   (cdr (assoc special-token-string INTERP-SPECIAL-TOKEN-ALIST)))
 
+(defun interp-token-highlight (token &optional highlight-face)
+  (when highlight-face
+    (let ((start-point (plist-get token :start))
+          (end-point (plist-get token :end)))
+      (add-text-properties start-point end-point `(face ,highlight-face)))))
+
 (defun interp-token (type start end)
-  `(:type ,type :start ,start :end ,end))
+  `(:type ,type :start ,start :end ,end :highlight interp-token-highlight))
 
 (defun interp-token-type (token)
   (plist-get token :type))
@@ -62,22 +68,52 @@
     (interp-remaining-tokens)))
 
 (defun interp-node-top (text-or-string top)
-  `(:type ,INTERP-NODE-TOP :head ,text-or-string :tail ,top))
+  `(:type ,INTERP-NODE-TOP
+    :head ,text-or-string
+    :tail ,top
+    :highlight interp-list-node-highlight))
+
+(defun interp-list-node-highlight (node &optional highlight-face)
+  (let* ((head-node (plist-get node :head))
+         (head-highlight (plist-get head-node :highlight))
+         (tail-node (plist-get node :tail))
+         (tail-highlight (plist-get tail-node :highlight)))
+    (apply head-highlight (list head-node highlight-face))
+    (apply tail-highlight (list tail-node highlight-face))))
 
 (defun interp-node-top-empty ()
-  `(:type ,INTERP-NODE-TOP-EMPTY))
+  `(:type ,INTERP-NODE-TOP-EMPTY :highlight interp-node-highlight-do-nothing))
+
+(defun interp-node-highlight-do-nothing (&rest args)
+  nil)
 
 (defun interp-node-string (open-quote contents close-quote)
   `(:type ,INTERP-NODE-STRING
     :open-quote ,open-quote
     :contents ,contents
-    :close-quote ,close-quote))
+    :close-quote ,close-quote
+    :highlight interp-node-string-highlight))
+
+(defun interp-node-string-highlight (string-node &optional highlight-face)
+  (let* ((open-quote-node (plist-get string-node :open-quote))
+          (open-quote-highlight (plist-get open-quote-node :highlight))
+          (contents-node (plist-get string-node :contents))
+          (contents-highlight (plist-get contents-node :highlight))
+          (close-quote-node (plist-get string-node :close-quote))
+          (close-quote-highlight (plist-get close-quote-node :highlight)))
+     (apply open-quote-highlight `(,open-quote-node font-lock-string-face))
+     (apply contents-highlight `(,contents-node font-lock-string-face))
+     (apply close-quote-highlight `(,close-quote-node font-lock-string-face))))
 
 (defun interp-node-string-contents (head string-contents)
-  `(:type ,INTERP-NODE-STRING-CONTENTS :head ,head :tail ,string-contents))
+  `(:type ,INTERP-NODE-STRING-CONTENTS
+    :head ,head
+    :tail ,string-contents
+    :highlight interp-list-node-highlight))
 
 (defun interp-node-string-contents-empty ()
-  `(:type ,INTERP-NODE-STRING-CONTENTS-EMPTY))
+  `(:type ,INTERP-NODE-STRING-CONTENTS-EMPTY
+    :highlight interp-node-highlight-do-nothing))
 
 (defun parse-result (node remaining-tokens)
   (cons node remaining-tokens))
@@ -85,10 +121,7 @@
 (defun interp-parse ()
   (interactive)
   (let ((tokens (interp-lex)))
-    (message "--------------------------")
-    (message "Tokens: %s" tokens)
-    (message "Parse:")
-    (pp (interp-parse-top tokens))))
+    (interp-parse-top tokens)))
 
 (defun interp-parse-top (tokens)
   (if tokens
@@ -130,3 +163,8 @@
                                                             remaining-contents-node)
                                tokens-after-parse)))))
     (parse-result (interp-node-string-contents-empty) tokens)))
+
+(defun interp-highlight ()
+  (interactive)
+  (let ((top-node-of-parse-tree (interp-parse)))
+    (interp-list-node-highlight top-node-of-parse-tree)))
