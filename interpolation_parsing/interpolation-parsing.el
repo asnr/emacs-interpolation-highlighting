@@ -28,6 +28,9 @@
 (defconst INTERP-NODE-STRING 'string)
 (defconst INTERP-NODE-STRING-CONTENTS 'string-contents)
 (defconst INTERP-NODE-STRING-CONTENTS-EMPTY 'string-contents-empty)
+(defconst INTERP-NODE-INTERPOLATION 'interpolation)
+(defconst INTERP-NODE-INTERPOLATION-CONTENTS 'interpolation-contents)
+(defconst INTERP-NODE-INTERPOLATION-CONTENTS-EMPTY 'interpolation-contents-empty)
 
 (defun interp-special-token-type (special-token-string)
   (cdr (assoc special-token-string INTERP-SPECIAL-TOKEN-ALIST)))
@@ -115,6 +118,34 @@
   `(:type ,INTERP-NODE-STRING-CONTENTS-EMPTY
     :highlight interp-node-highlight-do-nothing))
 
+(defun interp-node-interpolation (open-brace contents close-brace)
+  `(:type ,INTERP-NODE-INTERPOLATION
+    :open-brace ,open-brace
+    :contents ,contents
+    :close-brace ,close-brace
+    :highlight interp-node-interpolation-highlight))
+
+(defun interp-node-interpolation-highlight (interpolation-node &optional face-ignored)
+  (let* ((open-brace-node (plist-get interpolation-node :open-brace))
+         (open-brace-highlight (plist-get open-brace-node :highlight))
+         (contents-node (plist-get interpolation-node :contents))
+         (contents-highlight (plist-get contents-node :highlight))
+         (close-brace-node (plist-get interpolation-node :close-brace))
+         (close-brace-highlight (plist-get close-brace-node :highlight)))
+    (apply open-brace-highlight `(,open-brace-node font-lock-variable-name-face))
+    (apply contents-highlight `(,contents-node font-lock-variable-name-face))
+    (apply close-brace-highlight `(,close-brace-node font-lock-variable-name-face))))
+
+(defun interp-node-interpolation-contents (head interpolation-contents)
+  `(:type ,INTERP-NODE-INTERPOLATION-CONTENTS
+    :head ,head
+    :tail ,interpolation-contents
+    :highlight interp-list-node-highlight))
+
+(defun interp-node-interpolation-contents-empty ()
+  `(:type ,INTERP-NODE-INTERPOLATION-CONTENTS-EMPTY
+    :highlight interp-node-highlight-do-nothing))
+
 (defun parse-result (node remaining-tokens)
   (cons node remaining-tokens))
 
@@ -155,6 +186,17 @@
              (this-token-type (interp-token-type this-token)))
         (cond ((equal INTERP-TOKEN-QUOTE this-token-type)
                (parse-result (interp-node-string-contents-empty) tokens))
+              ((equal INTERP-TOKEN-OPEN-INTERP this-token-type)
+               (let* ((interpolation-parse (interp-parse-interpolation tokens))
+                      (interpolation-node (car interpolation-parse))
+                      (tokens-after-interpolation (cdr interpolation-parse))
+                      (remaining-contents-parse
+                       (interp-parse-string-contents tokens-after-interpolation))
+                      (remaining-contents-node (car remaining-contents-parse))
+                      (tokens-after-all-contents (cdr remaining-contents-parse)))
+                 (parse-result (interp-node-string-contents interpolation-node
+                                                            remaining-contents-node)
+                               tokens-after-all-contents)))
               (t
                (let* ((parse-result (interp-parse-string-contents next-tokens))
                       (remaining-contents-node (car parse-result))
@@ -163,6 +205,47 @@
                                                             remaining-contents-node)
                                tokens-after-parse)))))
     (parse-result (interp-node-string-contents-empty) tokens)))
+
+(defun interp-parse-interpolation (tokens)
+  (let* ((open-brace (car tokens))
+         (contents-parse-result (interp-parse-interpolation-contents (cdr tokens)))
+         (interpolation-contents-node (car contents-parse-result))
+         (remaining-tokens (cdr contents-parse-result))
+         (close-brace (car remaining-tokens))
+         (tokens-after-interpolation (cdr remaining-tokens)))
+    (parse-result (interp-node-interpolation open-brace
+                                             interpolation-contents-node
+                                             close-brace)
+                  tokens-after-interpolation)))
+
+(defun interp-parse-interpolation-contents (tokens)
+  (if tokens
+      (let* ((this-token (car tokens))
+             (next-tokens (cdr tokens))
+             (this-token-type (interp-token-type this-token)))
+        (cond ((equal INTERP-TOKEN-CLOSE-INTERP this-token-type)
+               (parse-result (interp-node-interpolation-contents-empty) tokens))
+              ((equal INTERP-TOKEN-QUOTE this-token-type)
+               (let* ((string-parse (interp-parse-string tokens))
+                      (string-node (car string-parse))
+                      (tokens-after-string (cdr string-parse))
+                      (remaining-contents-parse
+                       (interp-parse-interpolation-contents tokens-after-string))
+                      (remaining-contents-node (car remaining-contents-parse))
+                      (tokens-after-all-contents (cdr remaining-contents-parse)))
+                 (parse-result
+                  (interp-node-interpolation-contents string-node
+                                                      remaining-contents-node)
+                  tokens-after-all-contents)))
+              (t
+               (let* ((parse-result (interp-parse-interpolation-contents next-tokens))
+                      (remaining-contents-node (car parse-result))
+                      (tokens-after-parse (cdr parse-result)))
+                 (parse-result
+                  (interp-node-interpolation-contents this-token
+                                                      remaining-contents-node)
+                  tokens-after-parse)))))
+    (parse-result (interp-node-interpolation-contents-empty) tokens)))
 
 (defun interp-highlight ()
   (interactive)
