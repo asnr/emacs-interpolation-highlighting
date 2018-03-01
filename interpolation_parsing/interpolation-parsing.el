@@ -22,6 +22,10 @@
 (defconst INTERP-NODE-INTERPOLATION-CONTENTS 'interpolation-contents)
 (defconst INTERP-NODE-INTERPOLATION-CONTENTS-EMPTY 'interpolation-contents-empty)
 
+(defun interp-apply-highlight (token-or-node &optional highlight-face)
+  (let ((highlight-function-symbol (plist-get token-or-node :highlight)))
+    (apply highlight-function-symbol (list token-or-node highlight-face))))
+
 (defun interp-node-top (text-or-string top)
   `(:type ,INTERP-NODE-TOP
     :head ,text-or-string
@@ -30,11 +34,9 @@
 
 (defun interp-list-node-highlight (node &optional highlight-face)
   (let* ((head-node (plist-get node :head))
-         (head-highlight (plist-get head-node :highlight))
-         (tail-node (plist-get node :tail))
-         (tail-highlight (plist-get tail-node :highlight)))
-    (apply head-highlight (list head-node highlight-face))
-    (apply tail-highlight (list tail-node highlight-face))))
+         (tail-node (plist-get node :tail)))
+    (interp-apply-highlight head-node highlight-face)
+    (interp-apply-highlight tail-node highlight-face)))
 
 (defun interp-node-top-empty ()
   `(:type ,INTERP-NODE-TOP-EMPTY :highlight interp-node-highlight-do-nothing))
@@ -51,14 +53,11 @@
 
 (defun interp-node-string-highlight (string-node &optional highlight-face)
   (let* ((open-quote-node (plist-get string-node :open-quote))
-          (open-quote-highlight (plist-get open-quote-node :highlight))
-          (contents-node (plist-get string-node :contents))
-          (contents-highlight (plist-get contents-node :highlight))
-          (close-quote-node (plist-get string-node :close-quote))
-          (close-quote-highlight (plist-get close-quote-node :highlight)))
-     (apply open-quote-highlight `(,open-quote-node font-lock-string-face))
-     (apply contents-highlight `(,contents-node font-lock-string-face))
-     (apply close-quote-highlight `(,close-quote-node font-lock-string-face))))
+         (contents-node (plist-get string-node :contents))
+         (close-quote-node (plist-get string-node :close-quote)))
+    (interp-apply-highlight open-quote-node 'font-lock-string-face)
+    (interp-apply-highlight contents-node 'font-lock-string-face)
+    (interp-apply-highlight close-quote-node 'font-lock-string-face)))
 
 (defun interp-node-string-contents (head string-contents)
   `(:type ,INTERP-NODE-STRING-CONTENTS
@@ -79,14 +78,11 @@
 
 (defun interp-node-interpolation-highlight (interpolation-node &optional face-ignored)
   (let* ((open-brace-node (plist-get interpolation-node :open-brace))
-         (open-brace-highlight (plist-get open-brace-node :highlight))
          (contents-node (plist-get interpolation-node :contents))
-         (contents-highlight (plist-get contents-node :highlight))
-         (close-brace-node (plist-get interpolation-node :close-brace))
-         (close-brace-highlight (plist-get close-brace-node :highlight)))
-    (apply open-brace-highlight `(,open-brace-node font-lock-variable-name-face))
-    (apply contents-highlight `(,contents-node font-lock-variable-name-face))
-    (apply close-brace-highlight `(,close-brace-node font-lock-variable-name-face))))
+         (close-brace-node (plist-get interpolation-node :close-brace)))
+    (interp-apply-highlight open-brace-node 'font-lock-variable-name-face)
+    (interp-apply-highlight contents-node 'font-lock-variable-name-face)
+    (interp-apply-highlight close-brace-node 'font-lock-variable-name-face)))
 
 (defun interp-node-interpolation-contents (head interpolation-contents)
   `(:type ,INTERP-NODE-INTERPOLATION-CONTENTS
